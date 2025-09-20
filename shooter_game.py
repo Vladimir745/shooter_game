@@ -1,7 +1,7 @@
-#Создай собственный Шутер!
 from pygame import *
 from random import *                                        
 from time import time as timer
+
 font.init()
 font1 = font.SysFont('Arial', 36)
 font2 = font.SysFont('Arial', 36)
@@ -14,6 +14,7 @@ fire = mixer.Sound('fire.ogg')
 lose = font.render('YOU LOSE!', True, (255, 0, 0))
 win = font.render('YOU WIN!', True,(0, 255, 0))
 reload = font.render('wait, reload...', 1 ,(255, 0, 0))
+
 class GameSprite(sprite.Sprite):
     def __init__(self, player_image, player_x, player_y, size_x, size_y, player_speed):
         super().__init__()
@@ -22,8 +23,10 @@ class GameSprite(sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = player_x
         self.rect.y = player_y
+    
     def reset(self):
         window.blit(self.image, (self.rect.x, self.rect.y))
+
 class Player(GameSprite):
     def update(self):
         keys_pressed = key.get_pressed()
@@ -31,27 +34,35 @@ class Player(GameSprite):
             self.rect.x -= self.speed
         if keys_pressed[K_RIGHT] and self.rect.x < width - 80:
             self.rect.x += self.speed
+    
     def fire(self):
         bullet = Bullet('bullet.png', self.rect.centerx, self.rect.top, 10, 20, -15)
         bullets.add(bullet)
-
 
 class Enemy(GameSprite):
     def update(self):
         self.rect.y += self.speed
         global lost
         if self.rect.y > height:
-            lost_ship
+            lost_ship.play()  # Добавил .play() для звука
             self.rect.y = 0
             self.rect.x = randint(80, width - 80)
             lost += 1
+
+# НОВЫЙ КЛАСС ДЛЯ АСТЕРОИДОВ
+class Asteroid(GameSprite):
+    def update(self):
+        self.rect.y += self.speed
+        if self.rect.y > height:
+            # Астероиды просто перезапускаются, НЕ увеличивая счетчик lost
+            self.rect.y = 0
+            self.rect.x = randint(80, width - 80)
 
 class Bullet(GameSprite):
     def update(self):
         self.rect.y += self.speed
         if self.rect.y < 0:
             self.kill()
-        
 
 lost = 0
 score = 0
@@ -63,10 +74,13 @@ height = 500
 
 rocket = Player('rocket.png', 5, height - 100, 80, 100, 10)
 bullets = sprite.Group()
+
+# ИСПОЛЬЗУЕМ НОВЫЙ КЛАСС Asteroid
 asteroids = sprite.Group()
 for i in range(1, 3):
-    asteroid = Enemy('asteroid.png', randint(80, width - 80), -40, 80, 50, randint(1, 7))
+    asteroid = Asteroid('asteroid.png', randint(80, width - 80), -40, 80, 50, randint(1, 7))
     asteroids.add(asteroid)
+
 monsters = sprite.Group()
 for i in range(5):
     monster = Enemy('ufo.png', randint(80, width - 80), -40, 80, 50, randint(1, 5))
@@ -74,9 +88,9 @@ for i in range(5):
 
 finish = False
 run = True
-
 num_fire = 0
 reload_time = False
+
 
 while run:
     for e in event.get():
@@ -91,20 +105,24 @@ while run:
                 if num_fire >= 5 and reload_time == False:
                     last_time = timer()
                     reload_time = True
+    
     if not finish:
         window.blit(galaxy, (0, 0))
         text_lose = font1.render('Пропущено: ' + str(lost), 1, (255, 255, 255))
         window.blit(text_lose, (10, 40))
         text_win = font2.render('Счет: ' + str(score), 1, (255, 255, 255))
         window.blit(text_win, (10, 10))
+        
         rocket.update()
-        monsters.update()
-        asteroids.update()
+        monsters.update()    # Обновляем врагов (увеличивают lost при уходе)
+        asteroids.update()   # Обновляем астероиды (НЕ увеличивают lost)
         bullets.update()
+        
         rocket.reset()
         monsters.draw(window)
         asteroids.draw(window)
         bullets.draw(window)
+        
         if reload_time == True:
             now_time = timer()
             if now_time - last_time < 3:
@@ -112,19 +130,26 @@ while run:
             else:
                 num_fire = 0
                 reload_time = False
+        
         collide = sprite.groupcollide(bullets, monsters, True, True)
         for i in collide:
             score += 1
             monster = Enemy('ufo.png', randint(80, width - 80), -40, 80, 50, randint(1, 5))
             monsters.add(monster)
+        
+        # Проверяем столкновения
         if sprite.spritecollide(rocket, monsters, False) or lost >= 3:
             finish = True
             window.blit(lose, (200, 200))
+        
         if sprite.spritecollide(rocket, asteroids, False):
             finish = True
             window.blit(lose, (200, 200))
+        
         if score == 15:
             finish = True
             window.blit(win, (200, 200))
+        
         display.update()
+    
     time.delay(50)
